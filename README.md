@@ -14,6 +14,8 @@ Công cụ nội bộ theo dõi **game mobile đang trend theo từng quốc gia
 
 ## Dashboard có gì
 
+- **Thể loại:** mỗi thể loại (Puzzle, RPG, Strategy…) có bảng xếp hạng riêng do store cung cấp, top 50 mỗi nước. Bảng toàn cầu của thể loại cũng được tính riêng. iOS có 16 thể loại, Android có 17.
+- **Ảnh store listing:** cửa sổ chi tiết game hiện screenshot hiện tại (Android có thêm ảnh header, video và mô tả ngắn). Khi game đổi bộ ảnh, tool ghi lại ngày đổi và giữ 5 bộ ảnh cũ gần nhất để theo dõi creative. Tool chỉ lưu URL ảnh trong `data/listings.json`, không tải file ảnh về repo.
 - **Bảng xếp hạng:** Top Free / Top Grossing theo nước, hoặc **Toàn cầu**. Điểm toàn cầu = Σ trọng số nước × (101 − hạng) / 100; trọng số đặt trong `config.json`.
 - **Đang lên:** tăng hạng nhiều nhất so với 7 ngày trước.
 - **Mới vào top:** không có mặt trong top ở bất kỳ ngày nào trong 7 ngày trước.
@@ -26,7 +28,7 @@ Công cụ nội bộ theo dõi **game mobile đang trend theo từng quốc gia
 
 ```bash
 npm install
-npm run collect   # ~6 phút (iOS ~4 phút do Apple giới hạn tốc độ gọi)
+npm run collect   # ~25 phút (phần iOS chậm nhất do Apple giới hạn tốc độ gọi Lookup API)
 npm run dev       # build + mở http://localhost:5173
 ```
 
@@ -43,19 +45,20 @@ Chỉ chạy một store: `STORE=ios npm run collect` hoặc `STORE=android npm 
 - Để repo private và deploy `dist/` sang **Cloudflare Pages** (miễn phí với repo private, có thể khoá bằng Cloudflare Access). Hoặc:
 - Để repo private, không dùng Pages, mọi người `git pull` rồi chạy `npm run dev` trên máy.
 
-GitHub Actions với repo private được 2.000 phút miễn phí mỗi tháng. Mỗi lần chạy mất khoảng 7 phút, tức khoảng 210 phút/tháng.
+GitHub Actions không giới hạn số phút với repo public. Với repo private, gói free có 2.000 phút/tháng, trong khi mỗi lần chạy mất khoảng 25–30 phút (khoảng 900 phút/tháng), vẫn nằm trong hạn mức. Muốn chạy nhanh hơn thì đặt `genres.enabled: false`.
 
 ## Tuỳ chỉnh (`config.json`)
 
 - `countries`: danh sách nước và trọng số khi tính điểm toàn cầu.
 - `charts`: `free`, `grossing` (có thể thêm `paid`).
 - `limit`: số hạng mỗi bảng (tối đa 200 với iOS).
-- `android.detailTopN`: lấy số lượt cài cho top N game mỗi bảng.
+- `genres.enabled` / `genres.limit`: bật bảng theo thể loại và số hạng mỗi bảng thể loại.
+- `android.detailTopN` / `genreDetailTopN`: lấy lượt cài và ảnh listing cho top N game mỗi bảng chung / bảng thể loại.
 - `historyDays`: số ngày lịch sử hiển thị trên dashboard.
 
 ## Dung lượng
 
-Mỗi ngày khoảng 80 KB (gzip) trong `data/daily/`, tức khoảng 30 MB/năm. Khi repo quá nặng, có thể chuyển các file cũ sang nơi khác.
+Mỗi ngày khoảng 360 KB (gzip) trong `data/daily/`, tức khoảng 130 MB/năm. `data/listings.json` (URL ảnh) khoảng 14 MB, git chỉ lưu phần thay đổi giữa các ngày. Khi repo quá nặng, có thể chuyển các file daily cũ sang nơi khác.
 
 ## Giới hạn
 

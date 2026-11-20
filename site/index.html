@@ -23,6 +23,7 @@
         <button data-v="free">Top Free</button>
         <button data-v="grossing">Top Grossing</button>
       </div>
+      <select id="genre" aria-label="Thể loại"><option value="">Tất cả game</option></select>
     </div>
   </header>
 
@@ -35,7 +36,6 @@
         <button data-v="growth" id="growthTab">Tăng lượt cài</button>
       </div>
       <div class="filters">
-        <select id="genre" aria-label="Thể loại"><option value="">Mọi thể loại</option></select>
         <input id="q" type="search" placeholder="Tìm game / nhà phát hành…" aria-label="Tìm kiếm">
       </div>
     </div>
@@ -53,6 +53,7 @@
     <form method="dialog"><button class="close" aria-label="Đóng">×</button></form>
     <div id="detailBody"></div>
     <div class="chart-box"><canvas id="histChart"></canvas></div>
+    <section id="listing"></section>
   </dialog>
 
   <footer>

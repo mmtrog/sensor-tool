@@ -2,9 +2,14 @@
   "limit": 100,
   "charts": ["free", "grossing"],
   "historyDays": 30,
+  "genres": {
+    "enabled": true,
+    "limit": 50
+  },
   "android": {
     "detailTopN": 50,
-    "detailMax": 1500,
+    "genreDetailTopN": 15,
+    "detailMax": 3000,
     "concurrency": 4,
     "exclude": ["cn"]
   },

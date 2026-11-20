@@ -129,6 +129,18 @@ dialog::backdrop { background: rgb(0 0 0 / .45); }
 .chart-box { position: relative; height: 260px; }
 .d-ccs { margin: 0 0 14px; }
 
+#listing h3 { margin: 18px 0 4px; font-size: 15px; }
+#listing .hint { margin: 0 0 10px; }
+#listing a { color: var(--accent); }
+.summary { margin: 0 0 10px; }
+.shots { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+.shots a { flex: none; scroll-snap-align: start; }
+.shots img { height: 240px; width: auto; border-radius: 8px; border: 1px solid var(--line); background: var(--line); display: block; }
+.header-img { width: 100%; max-height: 220px; object-fit: cover; border-radius: 10px; margin-bottom: 8px; display: block; }
+.old-set { margin-top: 10px; }
+.old-set summary { cursor: pointer; color: var(--muted); margin-bottom: 8px; }
+.old-set .shots img { height: 160px; }
+
 footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16px 30px; }
 
 @media (max-width: 640px) {

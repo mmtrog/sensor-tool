@@ -56,12 +56,12 @@ function sparkline(hist, max) {
 }
 
 // ---------------------------------------------------------------- views
-function chartLimit() { return state.region === 'global' ? GLOBAL_TOP : index.limit; }
+function chartLimit() { return current?.limit ?? GLOBAL_TOP; }
+const genreLabel = () => index.genres[state.store].find((g) => g.key === state.genre)?.label;
 
 function selectRows() {
   let rows = current.rows;
   const q = state.q.trim().toLowerCase();
-  if (state.genre) rows = rows.filter((r) => appOf(r.id).g === state.genre);
   if (q) rows = rows.filter((r) => { const a = appOf(r.id); return `${a.n} ${a.d} ${r.id}`.toLowerCase().includes(q); });
 
   const L = chartLimit();
@@ -85,8 +85,9 @@ function hintText() {
   const days = index.days;
   const need = (n) => (days < n ? ` Cần ít nhất ${n} ngày dữ liệu (hiện có ${days}) để so sánh.` : '');
   const where = state.region === 'global' ? 'toàn cầu (gộp điểm các quốc gia theo trọng số)' : countryName(state.region);
+  const what = state.genre ? `game ${genreLabel()}` : 'game';
   return {
-    top: `Top ${chartLimit()} ${where}.${need(2)}`,
+    top: `Top ${chartLimit()} ${what} ${where}.${need(2)}`,
     rising: `Game tăng hạng nhiều nhất so với 7 ngày trước, gồm cả game mới lọt vào top.${need(8)}`,
     new: `Game có mặt hôm nay nhưng không xuất hiện trong top ở bất kỳ ngày nào trong 7 ngày trước.${need(2)}`,
     growth: `Sắp theo số ${metricName()} tăng thêm trong 7 ngày (hoặc 1 ngày nếu chưa đủ 7).${need(2)}`,
@@ -162,6 +163,9 @@ function openDetail(id) {
 
   const dlg = $('#detail');
   dlg.showModal();
+  dlg.scrollTop = 0;
+  dlg.dataset.id = id;
+  renderListing(id, a);
   if (!window.Chart) return;
   histChart?.destroy();
   const css = getComputedStyle(document.documentElement);
@@ -185,6 +189,47 @@ function openDetail(id) {
   });
 }
 
+// ---------------------------------------------------------------- store listing
+// Đổi kích thước ảnh qua URL: Apple (mzstatic) dùng hậu tố /WxHbb.jpg, Google dùng =wN / =hN.
+function imgUrl(u, store, big) {
+  if (store === 'ios') return u.replace(/\/\d+x\d+bb\.(jpg|png|webp)$/, big ? '/2000x2000bb.jpg' : '/0x480h.jpg');
+  return `${u.replace(/=[whs]\d+.*$/, '')}=${big ? 'h1600' : 'h400'}`;
+}
+const ytWatch = (u) => { const m = u?.match(/embed\/([\w-]+)/); return m ? `https://www.youtube.com/watch?v=${m[1]}` : u; };
+
+function shotsHtml(shots, store) {
+  return `<div class="shots">${shots.map((s) => `<a href="${esc(imgUrl(s, store, true))}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(imgUrl(s, store, false))}" alt=""></a>`).join('')}</div>`;
+}
+
+async function renderListing(id, a) {
+  const box = $('#listing');
+  const store = state.store;
+  if (!a.ls) {
+    box.innerHTML = `<h3>Ảnh store listing</h3><p class="hint">Chưa có ảnh cho game này${store === 'android' ? ' (Android chỉ lấy chi tiết cho các game top đầu mỗi bảng)' : ''}.</p>`;
+    return;
+  }
+  box.innerHTML = '<h3>Ảnh store listing</h3><p class="hint">Đang tải…</p>';
+  try {
+    const l = await getJson(`data/listing/${store}/${encodeURIComponent(id)}.json`);
+    if ($('#detail').dataset.id !== id) return; // người dùng đã mở game khác
+    const meta = [
+      l.ver && `Phiên bản ${esc(l.ver)}`,
+      l.vd && `cập nhật ${esc(l.vd)}`,
+      `bộ ảnh này từ ${esc(l.t)}`,
+      store === 'ios' && l.cc && `storefront ${esc(l.cc.toUpperCase())}`,
+    ].filter(Boolean).join(' · ');
+    box.innerHTML = `
+      <h3>Ảnh store listing</h3>
+      <p class="hint">${meta}${l.vid ? ` · <a href="${esc(ytWatch(l.vid))}" target="_blank" rel="noopener">Xem video ↗</a>` : ''}</p>
+      ${l.sum ? `<p class="summary">${esc(l.sum)}</p>` : ''}
+      ${l.hd ? `<a href="${esc(imgUrl(l.hd, store, true))}" target="_blank" rel="noopener"><img class="header-img" loading="lazy" src="${esc(imgUrl(l.hd, store, false))}" alt=""></a>` : ''}
+      ${shotsHtml(l.s, store)}
+      ${(l.h ?? []).map((h) => `<details class="old-set"><summary>Bộ ảnh cũ (từ ${esc(h.t)})</summary>${shotsHtml(h.s, store)}</details>`).join('')}`;
+  } catch {
+    box.innerHTML = '<h3>Ảnh store listing</h3><p class="hint">Không tải được ảnh.</p>';
+  }
+}
+
 // ---------------------------------------------------------------- controls
 function syncControls() {
   for (const k of ['store', 'chart', 'view']) {
@@ -194,17 +239,19 @@ function syncControls() {
   if (!regions.some((r) => r.cc === state.region)) state.region = 'global';
   $('#region').innerHTML = regions.map((r) => `<option value="${r.cc}" ${r.cc === state.region ? 'selected' : ''}>${esc(r.name)}${r.cc === 'global' ? '' : ` (${r.cc.toUpperCase()})`}</option>`).join('');
 
-  const genres = [...new Set(Object.values(apps[state.store]).map((a) => a.g).filter(Boolean))].sort();
-  if (state.genre && !genres.includes(state.genre)) state.genre = '';
-  $('#genre').innerHTML = `<option value="">Mọi thể loại</option>${genres.map((g) => `<option ${g === state.genre ? 'selected' : ''}>${esc(g)}</option>`).join('')}`;
+  const genres = index.genres[state.store] ?? [];
+  if (state.genre && !genres.some((g) => g.key === state.genre)) state.genre = '';
+  $('#genre').innerHTML = `<option value="">Tất cả game</option>${genres.map((g) => `<option value="${g.key}" ${g.key === state.genre ? 'selected' : ''}>${esc(g.label)}</option>`).join('')}`;
+  $('#genre').hidden = !genres.length;
   $('#q').value = state.q;
 }
 
 async function load() {
+  if ($('#detail').open) $('#detail').close();
   syncControls();
   writeHash();
   try {
-    current = await getJson(`data/${state.store}/${state.region}_${state.chart}.json`);
+    current = await getJson(`data/${state.store}/${state.region}_${state.chart}_${state.genre || 'all'}.json`);
     render();
   } catch (e) {
     $('#tbl tbody').innerHTML = '';
@@ -230,7 +277,7 @@ async function init() {
 
   ['store', 'chart', 'view'].forEach(bindSeg);
   $('#region').addEventListener('change', (e) => { state.region = e.target.value; load(); });
-  $('#genre').addEventListener('change', (e) => { state.genre = e.target.value; writeHash(); render(); });
+  $('#genre').addEventListener('change', (e) => { state.genre = e.target.value; load(); });
   let t;
   $('#q').addEventListener('input', (e) => { clearTimeout(t); t = setTimeout(() => { state.q = e.target.value; writeHash(); render(); }, 150); });
   $('#tbl tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) openDetail(tr.dataset.id); });
