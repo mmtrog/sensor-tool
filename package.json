@@ -1,0 +1,19 @@
+{
+  "name": "sensor-tool",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Theo dõi game mobile đang trend theo quốc gia và toàn cầu (App Store + Google Play), dữ liệu miễn phí.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "collect": "node scripts/collect.mjs",
+    "build": "node scripts/build.mjs",
+    "serve": "node scripts/serve.mjs",
+    "dev": "npm run build && npm run serve"
+  },
+  "dependencies": {
+    "google-play-scraper": "^10.1.4"
+  }
+}

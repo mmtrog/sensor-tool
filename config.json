@@ -1,0 +1,38 @@
+{
+  "limit": 100,
+  "charts": ["free", "grossing"],
+  "historyDays": 30,
+  "android": {
+    "detailTopN": 50,
+    "detailMax": 1500,
+    "concurrency": 4,
+    "exclude": ["cn"]
+  },
+  "ios": {
+    "exclude": []
+  },
+  "countries": [
+    { "cc": "us", "name": "Hoa Kỳ", "weight": 3 },
+    { "cc": "jp", "name": "Nhật Bản", "weight": 2 },
+    { "cc": "cn", "name": "Trung Quốc", "weight": 2 },
+    { "cc": "kr", "name": "Hàn Quốc", "weight": 1.5 },
+    { "cc": "gb", "name": "Anh", "weight": 1.2 },
+    { "cc": "de", "name": "Đức", "weight": 1.2 },
+    { "cc": "fr", "name": "Pháp", "weight": 1 },
+    { "cc": "ca", "name": "Canada", "weight": 1 },
+    { "cc": "au", "name": "Úc", "weight": 1 },
+    { "cc": "tw", "name": "Đài Loan", "weight": 1 },
+    { "cc": "hk", "name": "Hồng Kông", "weight": 1 },
+    { "cc": "br", "name": "Brazil", "weight": 1 },
+    { "cc": "mx", "name": "Mexico", "weight": 1 },
+    { "cc": "tr", "name": "Thổ Nhĩ Kỳ", "weight": 1 },
+    { "cc": "sa", "name": "Ả Rập Xê Út", "weight": 1 },
+    { "cc": "in", "name": "Ấn Độ", "weight": 1 },
+    { "cc": "id", "name": "Indonesia", "weight": 1 },
+    { "cc": "th", "name": "Thái Lan", "weight": 1 },
+    { "cc": "vn", "name": "Việt Nam", "weight": 1 },
+    { "cc": "ph", "name": "Philippines", "weight": 1 },
+    { "cc": "my", "name": "Malaysia", "weight": 1 },
+    { "cc": "sg", "name": "Singapore", "weight": 1 }
+  ]
+}
