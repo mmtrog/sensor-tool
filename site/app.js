@@ -5,7 +5,7 @@ const GLOBAL_TOP = 200;
 
 const state = { store: 'ios', region: 'global', chart: 'free', view: 'top', genre: '', q: '' };
 const sortState = { key: null, dir: 'asc' };
-let index, apps, current, histChart;
+let index, apps, taptapData, current, histChart;
 const cache = new Map();
 
 // ---------------------------------------------------------------- theme
@@ -66,6 +66,35 @@ function deltaHtml(d, isEntry) {
 }
 const growthHtml = (g) => (g == null ? '<span class="flat">—</span>' : g > 0 ? `<span class="up">+${cf.format(g)}</span>` : cf.format(g));
 
+const COUNTRY_DL_SCALE = {
+  us: 1, jp: 0.55, cn: 0.9, kr: 0.38, gb: 0.28, de: 0.26, fr: 0.22, ca: 0.16, au: 0.14,
+  tw: 0.18, hk: 0.08, br: 0.42, mx: 0.25, tr: 0.22, sa: 0.15, in: 0.65, id: 0.35,
+  th: 0.2, vn: 0.22, ph: 0.18, my: 0.12, sg: 0.07,
+};
+const COUNTRY_REV_SCALE = {
+  us: 1, jp: 0.72, cn: 0.85, kr: 0.42, gb: 0.22, de: 0.2, fr: 0.15, ca: 0.14, au: 0.12,
+  tw: 0.2, hk: 0.09, br: 0.08, mx: 0.06, tr: 0.06, sa: 0.12, in: 0.05, id: 0.07,
+  th: 0.08, vn: 0.06, ph: 0.04, my: 0.05, sg: 0.07,
+};
+
+function estDaily(r) {
+  if (state.chart === 'paid') return null;
+  const isRev = state.chart === 'grossing';
+  const base = isRev ? (state.store === 'ios' ? 1600000 : 1100000) : (state.store === 'ios' ? 95000 : 135000);
+  const exp = isRev ? -0.78 : -0.72;
+  const scales = isRev ? COUNTRY_REV_SCALE : COUNTRY_DL_SCALE;
+  const genreMul = state.genre ? 0.35 : 1;
+  if (state.region === 'global') {
+    let sum = 0;
+    for (const [cc, k] of r.countries ?? []) sum += base * (scales[cc] ?? 0.08) * (k ** exp);
+    return Math.round(sum * genreMul);
+  }
+  return Math.round(base * (scales[state.region] ?? 0.08) * (r.rank ** exp) * genreMul);
+}
+const estHtml = (v) => {
+  if (v == null) return '<span class="flat">—</span>';
+  return state.chart === 'grossing' ? `~$${cf.format(v)}` : `~${cf.format(v)}`;
+};
 function rankBadge(rank) {
   if (rank <= 3) return `<span class="medal m${rank}">${rank}</span>`;
   return rank;
@@ -211,6 +240,7 @@ function render() {
   const growthLabel = state.store === 'ios' ? 'Đánh giá +7n' : 'Lượt cài +7n';
   $('#growthTab').textContent = state.store === 'ios' ? 'Tăng đánh giá' : 'Tăng lượt cài';
 
+  const estLabel = state.chart === 'grossing' ? 'Est. Rev/ngày' : 'Est. DL/ngày';
   $('#tbl thead').innerHTML = `<tr>
     ${thSort('rank', '#', 'num')}
     ${thSort('d1', '1 ngày', 'num hide-sm')}
@@ -218,6 +248,7 @@ function render() {
     <th>Game</th>
     <th class="hide-sm">Thể loại</th>
     ${isGlobal ? '<th>Quốc gia lọt top</th>' : ''}
+    ${state.chart !== 'paid' ? `<th class="num hide-sm" title="Ước tính theo mô hình Power-law">${estLabel}</th>` : ''}
     ${thSort('growth', growthLabel, 'num')}
     ${thSort('total', `Tổng ${metricName()}`, 'num hide-sm')}
     <th class="hide-sm">Hạng ${index.days} ngày</th>
@@ -239,10 +270,11 @@ function render() {
       <td class="num hide-sm">${deltaHtml(r.d1, false)}</td>
       <td class="num">${deltaHtml(r.d7, r.n7)}</td>
       <td><div class="game"><img loading="lazy" src="${esc(a.i)}" alt=""><div>
-        <div class="t">${esc(a.n ?? r.id)}${r.isNew ? '<span class="badge">MỚI</span>' : ''}${hot ? '<span class="badge hot">HOT</span>' : ''}</div>
-        <div class="d">${esc(a.d)}</div></div></div></td>
+        <div class="t">${esc(a.n ?? r.id)}${r.isNew ? '<span class="badge">MỚI</span>' : ''}${hot ? '<span class="badge hot">HOT</span>' : ''}${a.sc ? `<span class="score-pill">★ ${a.sc}</span>` : ''}</div>
+        <div class="d">${esc(a.d)}${a.iap ? ` · IAP ${esc(a.iap)}` : ''}${a.ads === 1 ? ' · Ads' : ''}${a.gads?.c ? ` · 📢 ${a.gads.c} Google Ads` : ''}</div></div></div></td>
       <td class="hide-sm"><span class="genre-pill">${esc(a.g ?? '—')}</span></td>
       ${ccs}
+      ${state.chart !== 'paid' ? `<td class="num hide-sm" title="Ước tính">${estHtml(estDaily(r))}</td>` : ''}
       <td class="num">${growthHtml(r.g7 ?? r.g1)}</td>
       <td class="num hide-sm">${r.m == null ? '—' : cf.format(r.m)}</td>
       <td class="hide-sm">${sparkline(r.hist, L)}</td>
@@ -307,9 +339,22 @@ function openDetail(id) {
       <div class="stat"><div class="k">Tổng ${metricName()}</div><div class="v">${r.m == null ? '—' : nf.format(r.m)}</div></div>
       <div class="stat"><div class="k">${cap(metricName())} +1 ngày</div><div class="v">${growthHtml(r.g1)}</div></div>
       <div class="stat"><div class="k">${cap(metricName())} +7 ngày</div><div class="v">${growthHtml(r.g7)}</div></div>
+      ${a.sc ? `<div class="stat"><div class="k">Điểm đánh giá</div><div class="v" style="color:#f59e0b">★ ${a.sc}</div></div>` : ''}
+      ${a.iap ? `<div class="stat"><div class="k">Gói nạp IAP</div><div class="v" style="font-size:14px">${esc(a.iap)}</div></div>` : ''}
+      ${a.ads != null ? `<div class="stat"><div class="k">Quảng cáo</div><div class="v" style="font-size:14px">${a.ads ? 'Có Ads' : 'Không Ads'}</div></div>` : ''}
+      ${a.sz ? `<div class="stat"><div class="k">Dung lượng</div><div class="v" style="font-size:15px">${a.sz} MB</div></div>` : ''}
+      ${state.chart !== 'paid' ? `<div class="stat"><div class="k">${state.chart === 'grossing' ? 'Est. Rev/ngày' : 'Est. DL/ngày'}</div><div class="v" style="font-size:15px;color:var(--accent)">${estHtml(estDaily(r))}</div></div>` : ''}
+    </div>
+    ${a.nets?.length ? `<div class="nets"><span class="spy-label">app-ads.txt:</span>${a.nets.map((n) => `<span class="net-chip">${esc(n)}</span>`).join('')}</div>` : ''}
+    <div class="spy-bar">
+      <span class="spy-label">Ad Spy:</span>
+      <a class="spy-btn" href="https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL&q=${encodeURIComponent(a.n ?? id)}" target="_blank" rel="noopener">Meta Ad Library ↗</a>
+      <a class="spy-btn" href="${a.gads?.id ? `https://adstransparency.google.com/advertiser/${encodeURIComponent(a.gads.id)}?region=anywhere` : `https://adstransparency.google.com/?region=anywhere&text=${encodeURIComponent(a.d ?? a.n ?? id)}`}" target="_blank" rel="noopener">Google Ads${a.gads?.c ? ` (${a.gads.c} ads)` : ' Transparency'} ↗</a>
+      <a class="spy-btn" href="https://ads.tiktok.com/business/creativecenter/inspiration/topads/pc/en?keyword=${encodeURIComponent(a.n ?? id)}" target="_blank" rel="noopener">TikTok Top Ads ↗</a>
     </div>
     ${isGlobal ? `<div class="ccs d-ccs">${r.countries.map(([cc, k]) => `<span class="cc ${k <= 10 ? 'top10' : ''}">${esc(countryName(cc))} <b>#${k}</b></span>`).join('')}</div>` : ''}`;
 
+  $('.chart-panel').hidden = false;
   const dlg = $('#detail');
   if (!dlg.open) dlg.showModal();
   dlg.scrollTop = 0;
@@ -374,6 +419,18 @@ function shotsHtml(shots, store) {
   return `<div class="shots">${shots.map((s) => `<a href="${esc(imgUrl(s, store, true))}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(imgUrl(s, store, false))}" alt=""></a>`).join('')}</div>`;
 }
 
+function histogramHtml(hist) {
+  if (!hist || typeof hist !== 'object') return '';
+  const stars = [5, 4, 3, 2, 1];
+  const total = stars.reduce((s, k) => s + (hist[k] ?? 0), 0);
+  if (!total) return '';
+  return `<div class="hist-bars">${stars.map((k) => {
+    const c = hist[k] ?? 0;
+    const pct = ((c / total) * 100).toFixed(1);
+    return `<div class="hist-row"><span>${k}★</span><div class="hist-track"><div class="hist-fill" style="width:${pct}%"></div></div><span class="num">${cf.format(c)}</span></div>`;
+  }).join('')}</div>`;
+}
+
 async function renderListing(id, a) {
   const box = $('#listing');
   const store = state.store;
@@ -395,6 +452,8 @@ async function renderListing(id, a) {
       <h3>Ảnh store listing</h3>
       <p class="hint">${meta}${l.vid ? ` · <a href="${esc(ytWatch(l.vid))}" target="_blank" rel="noopener">Xem video ↗</a>` : ''}</p>
       ${l.sum ? `<p class="summary">${esc(l.sum)}</p>` : ''}
+      ${l.rn ? `<details class="old-set"><summary>What's New (Ghi chú cập nhật)</summary><div class="rel-notes">${esc(l.rn)}</div></details>` : ''}
+      ${histogramHtml(l.hist)}
       ${l.hd ? `<a href="${esc(imgUrl(l.hd, store, true))}" target="_blank" rel="noopener"><img class="header-img" loading="lazy" src="${esc(imgUrl(l.hd, store, false))}" alt=""></a>` : ''}
       ${shotsHtml(l.s, store)}
       ${(l.h ?? []).map((h) => `<details class="old-set"><summary>Bộ ảnh cũ (từ ${esc(h.t)})</summary>${shotsHtml(h.s, store)}</details>`).join('')}`;
@@ -403,11 +462,75 @@ async function renderListing(id, a) {
   }
 }
 
+// ---------------------------------------------------------------- TapTap CN
+const TAPTAP_TABS = { top: ['hot', 'Top Hot China'], rising: ['reserve', 'Pre-register (Sắp ra mắt)'], new: ['new', 'Mới ra mắt'] };
+
+function renderTapTap() {
+  const [listKey, label] = TAPTAP_TABS[state.view] ?? TAPTAP_TABS.top;
+  let rows = taptapData?.lists?.[listKey] ?? [];
+  const q = state.q.trim().toLowerCase();
+  if (q) rows = rows.filter((r) => `${r.title} ${r.bundleId ?? ''} ${(r.tags ?? []).join(' ')}`.toLowerCase().includes(q));
+
+  $('#kpis').innerHTML = `
+    <div class="kpi"><div class="kpi-label">TapTap China</div><div class="kpi-val">${rows.length}</div><div class="kpi-sub">${label}</div></div>
+    <div class="kpi"><div class="kpi-label">Cập nhật</div><div class="kpi-val" style="font-size:16px">${esc(taptapData?.date ?? '—')}</div><div class="kpi-sub">Nguồn: taptap.cn</div></div>
+    <div class="kpi"><div class="kpi-label">Điểm cao nhất</div><div class="kpi-val" style="color:#f59e0b">${rows.length ? `★ ${Math.max(...rows.map((r) => r.score ?? 0)).toFixed(1)}` : '—'}</div><div class="kpi-sub">Đánh giá cộng đồng TapTap</div></div>
+    <div class="kpi"><div class="kpi-label">Cross-store</div><div class="kpi-val">${rows.filter((r) => r.iosId || r.bundleId).length}</div><div class="kpi-sub">Game có ID App Store / Play</div></div>`;
+
+  $('#rowCount').textContent = `${rows.length} game`;
+  $('#hint').textContent = `Bảng xếp hạng ${label} trên TapTap Trung Quốc (${taptapData?.date ?? ''}). Bấm vào dòng để mở TapTap hoặc Ad Spy.`;
+  $('#tbl thead').innerHTML = `<tr>
+    <th class="num">#</th>
+    <th>Game</th>
+    <th class="hide-sm">Tag</th>
+    <th class="num">Điểm TapTap</th>
+    <th class="num hide-sm">Lượt quan tâm</th>
+    <th>Liên kết</th>
+  </tr>`;
+
+  $('#tbl tbody').innerHTML = rows.map((r) => `
+    <tr data-taptap="${esc(r.id)}">
+      <td class="num rank">${rankBadge(r.rank)}</td>
+      <td><div class="game"><img loading="lazy" src="${esc(r.icon)}" alt=""><div>
+        <div class="t">${esc(r.title)}</div>
+        <div class="d">${esc(r.bundleId ?? `TapTap #${r.id}`)}</div></div></div></td>
+      <td class="hide-sm">${(r.tags ?? []).map((t) => `<span class="genre-pill">${esc(t)}</span> `).join('')}</td>
+      <td class="num">${r.score ? `<span class="score-pill">★ ${r.score}</span>` : '—'}</td>
+      <td class="num hide-sm">${r.hits ? cf.format(r.hits) : '—'}</td>
+      <td>
+        <a class="spy-btn" href="https://www.taptap.cn/app/${esc(r.id)}" target="_blank" rel="noopener">TapTap ↗</a>
+        ${r.iosId ? `<a class="spy-btn" href="https://apps.apple.com/cn/app/id${esc(r.iosId)}" target="_blank" rel="noopener">iOS ↗</a>` : ''}
+      </td>
+    </tr>`).join('');
+  $('#empty').hidden = rows.length > 0;
+}
+
 // ---------------------------------------------------------------- controls
 function syncControls() {
+  const isTapTap = state.store === 'taptap';
   for (const k of ['store', 'chart', 'view']) {
     document.querySelectorAll(`#${k} button`).forEach((b) => b.classList.toggle('on', b.dataset.v === state[k]));
   }
+  $('#taptapBtn').hidden = !index.hasTapTap;
+  $('#region').hidden = isTapTap;
+  $('#chart').hidden = isTapTap;
+  $('#exportBtn').hidden = isTapTap;
+  $('#growthTab').hidden = isTapTap;
+
+  if (isTapTap) {
+    if (!TAPTAP_TABS[state.view]) state.view = 'top';
+    document.querySelector('#view [data-v="top"]').textContent = 'Top Hot CN';
+    document.querySelector('#view [data-v="rising"]').textContent = 'Pre-register (Sắp ra)';
+    document.querySelector('#view [data-v="new"]').textContent = 'Mới ra mắt';
+    $('#genre').hidden = true;
+    $('#q').value = state.q;
+    return;
+  }
+
+  document.querySelector('#view [data-v="top"]').textContent = 'Bảng xếp hạng';
+  document.querySelector('#view [data-v="rising"]').textContent = 'Đang lên (7 ngày)';
+  document.querySelector('#view [data-v="new"]').textContent = 'Mới vào top';
+
   const regions = [{ cc: 'global', name: '🌍 Toàn cầu' }, ...index.countries.filter((c) => c.stores.includes(state.store))];
   if (!regions.some((r) => r.cc === state.region)) state.region = 'global';
   $('#region').innerHTML = regions.map((r) => `<option value="${r.cc}" ${r.cc === state.region ? 'selected' : ''}>${esc(r.name)}${r.cc === 'global' ? '' : ` (${r.cc.toUpperCase()})`}</option>`).join('');
@@ -424,6 +547,11 @@ async function load() {
   syncControls();
   writeHash();
   try {
+    if (state.store === 'taptap') {
+      taptapData = await getJson('data/taptap.json');
+      renderTapTap();
+      return;
+    }
     current = await getJson(`data/${state.store}/${state.region}_${state.chart}_${state.genre || 'all'}.json`);
     render();
   } catch (e) {
@@ -441,8 +569,37 @@ function bindSeg(id) {
     if (!v || v === state[id]) return;
     state[id] = v;
     sortState.key = null;
-    if (id === 'view') { syncControls(); writeHash(); render(); } else load();
+    if (id === 'view') {
+      syncControls();
+      writeHash();
+      if (state.store === 'taptap') renderTapTap(); else render();
+    } else load();
   });
+}
+
+async function openKeywords() {
+  $('#dlgTag').textContent = 'ASO Hot Keywords · App Store US';
+  $('.chart-panel').hidden = true;
+  $('#listing').innerHTML = '';
+  $('#detailBody').innerHTML = '<p class="hint">Đang tải từ khóa…</p>';
+  const dlg = $('#detail');
+  if (!dlg.open) dlg.showModal();
+  try {
+    const kw = await getJson('data/keywords.json');
+    $('#detailBody').innerHTML = `
+      <p class="hint" style="margin-top:0">Cập nhật ${esc(kw.date)} · Gợi ý tìm kiếm App Store kèm điểm phổ biến (priority score).</p>
+      <div style="display:grid;gap:14px;padding-bottom:20px">
+        ${Object.entries(kw.seeds ?? {}).map(([seed, list]) => `
+          <div>
+            <div class="spy-label" style="margin-bottom:6px">${esc(seed)}</div>
+            <div class="ccs" style="max-width:none">
+              ${list.map((x) => `<span class="cc">${esc(x.term)} <b>${x.score}</b></span>`).join('')}
+            </div>
+          </div>`).join('')}
+      </div>`;
+  } catch {
+    $('#detailBody').innerHTML = '<p class="hint">Chưa có dữ liệu từ khóa.</p>';
+  }
 }
 
 async function init() {
@@ -456,7 +613,14 @@ async function init() {
   $('#region').addEventListener('change', (e) => { state.region = e.target.value; sortState.key = null; load(); });
   $('#genre').addEventListener('change', (e) => { state.genre = e.target.value; sortState.key = null; load(); });
   let t;
-  $('#q').addEventListener('input', (e) => { clearTimeout(t); t = setTimeout(() => { state.q = e.target.value; writeHash(); render(); }, 150); });
+  $('#q').addEventListener('input', (e) => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      state.q = e.target.value;
+      writeHash();
+      if (state.store === 'taptap') renderTapTap(); else render();
+    }, 150);
+  });
   $('#tbl thead').addEventListener('click', (e) => {
     const th = e.target.closest('th[data-sort]');
     if (!th) return;
@@ -468,6 +632,8 @@ async function init() {
   $('#tbl tbody').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-id]'); if (tr) openDetail(tr.dataset.id); });
   $('#detail').addEventListener('click', (e) => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   $('#exportBtn').addEventListener('click', exportCsv);
+  $('#kwBtn').hidden = !index.hasKeywords;
+  $('#kwBtn').addEventListener('click', openKeywords);
   document.addEventListener('keydown', (e) => {
     if (e.key === '/' && document.activeElement !== $('#q') && !$('#detail').open) {
       e.preventDefault();

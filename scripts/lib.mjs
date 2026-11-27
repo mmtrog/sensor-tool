@@ -71,6 +71,10 @@ export async function writeJson(file, obj, pretty = false) {
 }
 
 export const LISTINGS_FILE = path.join(DATA_DIR, 'listings.json');
+export const ADNETS_FILE = path.join(DATA_DIR, 'adnetworks.json');
+export const TAPTAP_FILE = path.join(DATA_DIR, 'taptap.json');
+export const ADSPY_FILE = path.join(DATA_DIR, 'adspy.json');
+export const KEYWORDS_FILE = path.join(DATA_DIR, 'keywords.json');
 
 /**
  * Thể loại game. Key dùng chung giữa 2 store khi trùng nghĩa.

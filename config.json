@@ -4,7 +4,7 @@
   "historyDays": 30,
   "genres": {
     "enabled": true,
-    "limit": 50
+    "limit": 100
   },
   "android": {
     "detailTopN": 50,

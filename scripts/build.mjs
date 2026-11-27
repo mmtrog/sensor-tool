@@ -2,14 +2,14 @@
 import { cp, rm, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import {
-  ROOT, APPS_FILE, LISTINGS_FILE, GENRES, chartKeys, loadConfig, listSnapshotDates, readSnapshot, readJson, writeJson, daysBetween,
+  ROOT, APPS_FILE, LISTINGS_FILE, ADNETS_FILE, TAPTAP_FILE, ADSPY_FILE, KEYWORDS_FILE, GENRES, chartKeys, loadConfig, listSnapshotDates, readSnapshot, readJson, writeJson, daysBetween,
 } from './lib.mjs';
 
 const cfg = await loadConfig();
 const DIST = path.join(ROOT, 'dist');
 const STORES = ['ios', 'android'];
 const limitFor = (ck) => (ck.genre ? cfg.genres.limit : cfg.limit);
-const globalTopFor = (ck) => (ck.genre ? 100 : 200);
+const globalTopFor = (ck) => (ck.genre ? 150 : 200);
 const fileFor = (store, region, ck) => `${store}/${region}_${ck.chart}_${ck.genre?.key ?? 'all'}.json`;
 
 const allDates = await listSnapshotDates();
@@ -148,21 +148,32 @@ for (const store of STORES) {
 // ---- thông tin app + ảnh store listing (mỗi app 1 file, chỉ tải khi mở chi tiết)
 const apps = await readJson(APPS_FILE, { ios: {}, android: {} });
 const listings = await readJson(LISTINGS_FILE, { ios: {}, android: {} });
+const adnets = await readJson(ADNETS_FILE, {});
+const adspy = await readJson(ADSPY_FILE, {});
+const taptap = await readJson(TAPTAP_FILE, null);
+const keywords = await readJson(KEYWORDS_FILE, null);
 const appsOut = {};
 for (const store of STORES) {
   appsOut[store] = {};
   for (const id of usedApps[store]) {
+    const a = apps[store][id] ?? {};
     const l = listings[store]?.[id];
-    appsOut[store][id] = { ...(apps[store][id] ?? {}), ...(l ? { ls: 1 } : {}) };
+    const nets = a.dw && adnets[a.dw]?.nets?.length ? adnets[a.dw].nets : undefined;
+    const gads = a.d && adspy[a.d]?.id ? { id: adspy[a.d].id, n: adspy[a.d].n, c: adspy[a.d].c } : undefined;
+    appsOut[store][id] = { ...a, ...(l ? { ls: 1 } : {}), ...(nets ? { nets } : {}), ...(gads ? { gads } : {}) };
     if (l) await writeJson(path.join(DIST, 'data', 'listing', store, `${id}.json`), l);
   }
 }
 await writeJson(path.join(DIST, 'data', 'apps.json'), appsOut);
+if (taptap) await writeJson(path.join(DIST, 'data', 'taptap.json'), taptap);
+if (keywords) await writeJson(path.join(DIST, 'data', 'keywords.json'), keywords);
 await writeJson(path.join(DIST, 'data', 'index.json'), {
   date: latest.date,
   generated: new Date().toISOString(),
   days: dates.length,
   firstDate: allDates[0],
+  hasTapTap: Boolean(taptap),
+  hasKeywords: Boolean(keywords),
   charts: cfg.charts,
   genres: Object.fromEntries(STORES.map((s) => [s, cfg.genres?.enabled ? GENRES[s].map(({ key, label }) => ({ key, label })) : []])),
   countries: cfg.countries.map(({ cc, name }) => ({ cc, name, stores: STORES.filter((s) => latest.ranks[s]?.[cc]) })),
